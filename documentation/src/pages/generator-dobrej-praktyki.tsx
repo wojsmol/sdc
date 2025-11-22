@@ -1,20 +1,33 @@
+// src/pages/generator-dobrej-praktyki.tsx
 import React, { useState, useEffect, ChangeEvent } from "react";
 import Layout from "@theme/Layout";
 import JSZip from "jszip";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
-
-// Import izolowanego Tailwind
-import "./tw/tw-tailwind.css";
+import { useForm } from "react-hook-form";
 
 const STORAGE_KEY = "dobraPraktykaForm";
 
-const initialForm = {
+export const initialForm = {
   title: "",
   opis: "",
   podmiot: "",
@@ -27,6 +40,8 @@ const initialForm = {
   rezultaty: "",
 };
 
+export type FormValues = typeof initialForm;
+
 function generateId(title: string) {
   return title
     .toLowerCase()
@@ -34,9 +49,8 @@ function generateId(title: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-function generateMdx(form: any, files: File[]) {
+function generateMdx(form: FormValues, files: File[]) {
   const id = generateId(form.title || "dobra-praktyka");
-
   return `---
 id: ${id}
 title: ${form.title}
@@ -77,10 +91,13 @@ ${files.length ? files.map((f) => "- " + f.name).join("\n") : "_Brak załącznik
 type Errors = { [key: string]: string };
 
 export default function GeneratorDobrejPraktyki() {
-  const [form, setForm] = useState<any>(initialForm);
   const [files, setFiles] = useState<File[]>([]);
   const [mdx, setMdx] = useState<string>("");
   const [errors, setErrors] = useState<Errors>({});
+
+  const form = useForm<FormValues>({
+    defaultValues: initialForm,
+  });
 
   // Load from localStorage
   useEffect(() => {
@@ -88,7 +105,7 @@ export default function GeneratorDobrejPraktyki() {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        setForm({ ...initialForm, ...JSON.parse(saved) });
+        form.reset({ ...initialForm, ...JSON.parse(saved) });
       } catch {}
     }
   }, []);
@@ -96,43 +113,16 @@ export default function GeneratorDobrejPraktyki() {
   // Save to localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
+    const subscription = form.watch((values) => {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(values));
+    });
+    return () => subscription.unsubscribe();
   }, [form]);
 
   // Generate MDX preview
   useEffect(() => {
-    setMdx(generateMdx(form, files));
-  }, [form, files]);
-
-  // Validation
-  const validate = (data: any): Errors => {
-    const newErrors: Errors = {};
-
-    if (!data.title.trim()) newErrors.title = "Tytuł jest wymagany.";
-    if (!data.podmiot.trim()) newErrors.podmiot = "Podmiot jest wymagany.";
-    if (!data.zglaszajacy.trim())
-      newErrors.zglaszajacy = "Zgłaszający jest wymagany.";
-    if (!data.wymiar.trim())
-      newErrors.wymiar = "Wymiar dostępności jest wymagany.";
-
-    const opisLen = data.opis.trim().length;
-    if (opisLen < 500 || opisLen > 1500)
-      newErrors.opis = "Opis musi mieć od 500 do 1500 znaków.";
-
-    return newErrors;
-  };
-
-  // Live validation on key fields
-  useEffect(() => {
-    setErrors((prev) => ({ ...prev, ...validate(form) }));
-  }, [form.title, form.podmiot, form.zglaszajacy, form.wymiar, form.opis]);
-
-  const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setForm((prev: any) => ({ ...prev, [name]: value }));
-  };
+    setMdx(generateMdx(form.getValues(), files));
+  }, [form.watch(), files]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
@@ -171,16 +161,26 @@ export default function GeneratorDobrejPraktyki() {
   };
 
   const handleExportZip = async () => {
-    const formErrors = validate(form);
-    setErrors((prev) => ({ ...prev, ...formErrors }));
-    if (Object.keys(formErrors).length > 0) {
+    const values = form.getValues();
+    const newErrors: Errors = {};
+    if (!values.title.trim()) newErrors.title = "Tytuł jest wymagany.";
+    if (!values.podmiot.trim()) newErrors.podmiot = "Podmiot jest wymagany.";
+    if (!values.zglaszajacy.trim()) newErrors.zglaszajacy = "Zgłaszający jest wymagany.";
+    if (!values.wymiar.trim()) newErrors.wymiar = "Wymiar dostępności jest wymagany.";
+
+    const opisLen = values.opis.trim().length;
+    if (opisLen < 500 || opisLen > 1500)
+      newErrors.opis = "Opis musi mieć od 500 do 1500 znaków.";
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       alert("Proszę poprawić błędy przed eksportem.");
       return;
     }
 
-    const id = generateId(form.title);
+    const id = generateId(values.title);
     const zip = new JSZip();
-    zip.file(`${id}.mdx`, mdx);
+    zip.file(`${id}.mdx`, generateMdx(values, files));
     files.forEach((file) => zip.file(file.name, file));
 
     const content = await zip.generateAsync({ type: "blob" });
@@ -190,251 +190,194 @@ export default function GeneratorDobrejPraktyki() {
     a.click();
   };
 
-    const opisLength = (form.opis || "").trim().length;
-    const opisValid = opisLength >= 500 && opisLength <= 1500;
+  const opisLength = form.watch("opis").trim();
+  const opisValid = opisLength.length >= 500 && opisLength.length <= 1500;
 
-    return (
-        <Layout
-            title="Generator opisu dobrej praktyki"
-            description="Generator MDX dla opisów dobrych praktyk w Sieci Dostępności Cyfrowej"
-        >
-    <div className="tw">
-      <div className="tw-content max-w-5xl mx-auto p-6 space-y-6">
+  return (
+    <Layout
+      title="Generator opisu dobrej praktyki"
+      description="Generator MDX dla opisów dobrych praktyk w Sieci Dostępności Cyfrowej"
+    >
+      <div className="tw">
+        <div className="tw-content max-w-5xl mx-auto p-6 space-y-6">
+          <h1 className="text-3xl font-bold text-[#003366]">
+            Generator opisu dobrej praktyki (MDX)
+          </h1>
 
-        <h1 className="text-3xl font-bold text-[#003366]">
-          Generator opisu dobrej praktyki (MDX)
-        </h1>
+          <p className="text-sm text-gray-700">
+            Uzupełnij formularz. Na końcu pobierzesz ZIP z plikiem MDX i załącznikami.
+          </p>
 
-        <p className="text-sm text-gray-700">
-          Uzupełnij formularz. Na końcu pobierzesz ZIP z plikiem MDX i załącznikami.
-        </p>
-
-        <Card>
-          <CardContent className="p-4 space-y-4">
-
-            {/* Form */}
-            <form className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-              {/* Lewa kolumna */}
-              <div className="space-y-4">
-
-                {/* Tytuł */}
-                <div>
-                  <Label className="tw-label">Tytuł*</Label>
-                  <Input
-                    name="title"
-                    value={form.title}
-                    onChange={handleChange}
-                    className={`tw-input ${errors.title ? "border-red-500" : ""}`}
-                    placeholder="Krótka nazwa dobrej praktyki"
-                  />
-                  {errors.title && <p className="tw-error">{errors.title}</p>}
-                </div>
-
-                {/* Podmiot */}
-                <div>
-                  <Label className="tw-label">Podmiot realizujący*</Label>
-                  <Input
-                    name="podmiot"
-                    value={form.podmiot}
-                    onChange={handleChange}
-                    className={`tw-input ${errors.podmiot ? "border-red-500" : ""}`}
-                    placeholder="Nazwa instytucji"
-                  />
-                  {errors.podmiot && <p className="tw-error">{errors.podmiot}</p>}
-                </div>
-
-                {/* Zgłaszający */}
-                <div>
-                  <Label className="tw-label">Zgłaszający*</Label>
-                  <Input
-                    name="zglaszajacy"
-                    value={form.zglaszajacy}
-                    onChange={handleChange}
-                    className={`tw-input ${errors.zglaszajacy ? "border-red-500" : ""}`}
-                    placeholder="Imię i nazwisko"
-                  />
-                  {errors.zglaszajacy && (
-                    <p className="tw-error">{errors.zglaszajacy}</p>
-                  )}
-                </div>
-
-                {/* Wymiar */}
-                <div>
-                  <Label className="tw-label">Wymiar dostępności cyfrowej*</Label>
-                  <select
-                    name="wymiar"
-                    value={form.wymiar}
-                    onChange={handleChange}
-                    className={`tw-input ${errors.wymiar ? "border-red-500" : ""}`}
-                  >
-                    <option value="">-- wybierz wymiar --</option>
-                    <option value="Komunikacja">Komunikacja</option>
-                    <option value="Wiedza i umiejętności">Wiedza i umiejętności</option>
-                    <option value="Wsparcie">Wsparcie</option>
-                    <option value="Cykl życia TIK">Cykl życia TIK</option>
-                    <option value="Pracownicy">Pracownicy</option>
-                    <option value="Zaopatrzenie">Zaopatrzenie</option>
-                    <option value="Zarządzanie i kultura">Zarządzanie i kultura</option>
-                  </select>
-
-                  {errors.wymiar && <p className="tw-error">{errors.wymiar}</p>}
-                </div>
-
-                {/* Kontakt */}
-                <div>
-                  <Label className="tw-label">Dane kontaktowe</Label>
-                  <Input
-                    name="kontakt"
-                    value={form.kontakt}
-                    onChange={handleChange}
-                    className="tw-input"
-                    placeholder="Adres e-mail lub numer telefonu"
-                  />
-                </div>
-
-              </div>
-
-              {/* Prawa kolumna */}
-              <div className="space-y-4">
-
-                {/* Opis */}
-                <div>
-                  <Label className="tw-label">Krótki opis (500–1500 znaków)*</Label>
-                  <Textarea
-                    name="opis"
-                    value={form.opis}
-                    onChange={handleChange}
-                    className={`tw-textarea ${
-                      !form.opis
-                        ? ""
-                        : opisLength >= 500 && opisLength <= 1500
-                        ? "border-green-600"
-                        : "border-red-500"
-                    }`}
-                    rows={6}
-                    maxLength={1500}
-                    placeholder="Zwięźle opisz, na czym polega praktyka i jak pomaga w zarządzaniu dostępnością."
-                  />
-                  <div className="flex justify-between tw-counter">
-                    <span className={opisLength >= 500 && opisLength <= 1500 ? "text-green-600" : "text-red-600"}>
-                      {opisLength}/1500
-                    </span>
-                    {errors.opis && <span className="text-red-600">{errors.opis}</span>}
+          <Card>
+            <CardContent className="p-4 space-y-4">
+              <Form {...form}>
+                <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={(e) => e.preventDefault()}>
+                  {/* Lewa kolumna */}
+                  <div className="space-y-4">
+                    <FormField<FormValues>
+                      control={form.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tytuł*</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Krótka nazwa dobrej praktyki" />
+                          </FormControl>
+                          <FormMessage>{errors.title}</FormMessage>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField<FormValues>
+                      control={form.control}
+                      name="podmiot"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Podmiot realizujący*</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Nazwa instytucji" />
+                          </FormControl>
+                          <FormMessage>{errors.podmiot}</FormMessage>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField<FormValues>
+                      control={form.control}
+                      name="zglaszajacy"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Zgłaszający*</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Imię i nazwisko" />
+                          </FormControl>
+                          <FormMessage>{errors.zglaszajacy}</FormMessage>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField<FormValues>
+                      control={form.control}
+                      name="wymiar"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Wymiar dostępności cyfrowej*</FormLabel>
+                          <FormControl>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="-- wybierz wymiar --" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[
+                                  "Komunikacja",
+                                  "Wiedza i umiejętności",
+                                  "Wsparcie",
+                                  "Cykl życia TIK",
+                                  "Pracownicy",
+                                  "Zaopatrzenie",
+                                  "Zarządzanie i kultura",
+                                ].map((opt) => (
+                                  <SelectItem key={opt} value={opt}>
+                                    {opt}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </FormControl>
+                          <FormMessage>{errors.wymiar}</FormMessage>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField<FormValues>
+                      control={form.control}
+                      name="kontakt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Dane kontaktowe</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Adres e-mail lub numer telefonu" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                </div>
 
-                {/* Problem */}
-                <div>
-                  <Label className="tw-label">Problem</Label>
-                  <Textarea
-                    name="problem"
-                    value={form.problem}
-                    onChange={handleChange}
-                    className="tw-textarea"
-                    rows={3}
-                    placeholder="Jaki problem rozwiązuje praktyka?"
-                  />
-                </div>
+                  {/* Prawa kolumna */}
+                  <div className="space-y-4">
+                    <FormField<FormValues>
+                      control={form.control}
+                      name="opis"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Krótki opis (500–1500 znaków)*</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} rows={6} maxLength={1500} />
+                          </FormControl>
+                          <div className="flex justify-between text-sm">
+                            <span className={opisValid ? "text-green-600" : "text-red-600"}>
+                              {opisLength.length}/1500
+                            </span>
+                            {errors.opis && <span className="text-red-600">{errors.opis}</span>}
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    {["problem", "cele", "dzialania", "rezultaty"].map((name) => (
+                      <FormField<FormValues>
+                        key={name}
+                        control={form.control}
+                        name={name as keyof FormValues}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{name.charAt(0).toUpperCase() + name.slice(1)}</FormLabel>
+                            <FormControl>
+                              <Textarea {...field} rows={3} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                </form>
+              </Form>
 
-                {/* Cele */}
-                <div>
-                  <Label className="tw-label">Cele</Label>
-                  <Textarea
-                    name="cele"
-                    value={form.cele}
-                    onChange={handleChange}
-                    className="tw-textarea"
-                    rows={3}
-                    placeholder="Jakie cele realizuje praktyka?"
-                  />
-                </div>
-
-                {/* Wdrożenie */}
-                <div>
-                  <Label className="tw-label">Jak wdrożono praktykę</Label>
-                  <Textarea
-                    name="dzialania"
-                    value={form.dzialania}
-                    onChange={handleChange}
-                    className="tw-textarea"
-                    rows={4}
-                    placeholder="Najważniejsze działania i etapy."
-                  />
-                </div>
-
-                {/* Rezultaty */}
-                <div>
-                  <Label className="tw-label">Rezultaty</Label>
-                  <Textarea
-                    name="rezultaty"
-                    value={form.rezultaty}
-                    onChange={handleChange}
-                    className="tw-textarea"
-                    rows={3}
-                    placeholder="Jakie efekty uzyskano?"
-                  />
-                </div>
-
-              </div>
-            </form>
-
-            {/* Załączniki */}
-            <div className="tw-section space-y-2">
-              <Label className="tw-label">Załączniki (PDF, DOCX, ZIP)</Label>
-
-              <Input
-                type="file"
-                multiple
-                onChange={handleFileChange}
-                className="tw-input text-sm"
-              />
-
-              {Object.entries(errors)
-                .filter(([k]) => k.startsWith("file:"))
-                .map(([k, m]) => (
-                  <p key={k} className="tw-error">{m}</p>
-                ))}
-
-              {files.length > 0 && (
-                <ul className="space-y-1 text-sm">
-                  {files.map((file) => (
-                    <li key={file.name} className="flex justify-between">
-                      <span>{file.name}</span>
-                      <button
-                        type="button"
-                        className="text-red-600 text-xs underline"
-                        onClick={() => removeFile(file.name)}
-                      >
-                        Usuń
-                      </button>
-                    </li>
+              {/* Załączniki */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Załączniki (PDF, DOCX, ZIP)</label>
+                <Input type="file" multiple onChange={handleFileChange} />
+                {Object.entries(errors)
+                  .filter(([k]) => k.startsWith("file:"))
+                  .map(([k, m]) => (
+                    <p key={k} className="text-red-600 text-sm">{m}</p>
                   ))}
-                </ul>
-              )}
-            </div>
+                {files.length > 0 && (
+                  <ul className="text-sm">
+                    {files.map((f) => (
+                      <li key={f.name} className="flex justify-between">
+                        {f.name}
+                        <button
+                          type="button"
+                          className="text-red-600 text-xs underline"
+                          onClick={() => removeFile(f.name)}
+                        >
+                          Usuń
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
-            <div>
-              <Button className="tw-button-primary" onClick={handleExportZip}>
-                Pobierz ZIP (MDX + załączniki)
-              </Button>
-            </div>
+              <Button onClick={handleExportZip}>Pobierz ZIP (MDX + załączniki)</Button>
+            </CardContent>
+          </Card>
 
-          </CardContent>
-        </Card>
-
-        {/* Podgląd MDX */}
-        <Card>
-          <CardContent className="p-4 space-y-2">
-            <h2 className="text-xl font-semibold">Podgląd MDX</h2>
-
-            <pre className="tw-preview">
-{mdx}
-            </pre>
-          </CardContent>
-                </Card>
-            </div>
+          {/* Podgląd MDX */}
+          <Card>
+            <CardContent>
+              <h2 className="text-xl font-semibold">Podgląd MDX</h2>
+              <pre className="whitespace-pre-wrap">{mdx}</pre>
+            </CardContent>
+          </Card>
         </div>
-    </Layout >
+      </div>
+    </Layout>
   );
 }
