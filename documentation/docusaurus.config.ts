@@ -41,11 +41,10 @@ const config: Config = {
                 termsDir: './docs/terms',
                 docsDir: './docs/',
                 glossaryFilepath: './docs/glossary.md',
-            },
+            }, 
         ],
-
-        // --- DODANY PLUGIN ALIASÓW @ ---
-        path.resolve(__dirname, 'plugins/alias-plugin'),
+    './src/plugins/tailwind.js',
+    "./src/plugins/alias-plugin.js" // alias plugin
     ],
 
     // =====================================

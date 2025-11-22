@@ -61,3 +61,19 @@
 :root {
   --tw-shadow: 0 0 #0000;
 }
+
+/* Tailwind v4.1 theme tokens (colors, spacing, variables, etc.) */
+@import "tailwindcss/theme.css" layer(theme);
+
+/* Scope preflight to not affect Docusaurus UI */
+@layer base {
+  .tw {
+    @import "tailwindcss/preflight.css" layer(base);
+  }
+}
+
+/* Utilities layer — no scope needed */
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* Optional: dark mode compatibility */
+@custom-variant dark (&:is([data-theme="dark"] *));
