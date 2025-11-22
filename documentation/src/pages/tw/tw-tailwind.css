@@ -24,39 +24,6 @@
   .tw * {
     @apply box-border;
   }
-
-  /* Dodatkowe klasy narzędziowe dostępne tylko w generatorach */
-  .tw-section {
-    @apply py-4;
-  }
-
-  .tw-label {
-    @apply font-medium text-sm text-gray-900;
-  }
-
-  .tw-input {
-    @apply border rounded px-2 py-1 w-full;
-  }
-
-  .tw-textarea {
-    @apply border rounded px-2 py-1 w-full;
-  }
-
-  .tw-error {
-    @apply text-xs text-red-600 mt-1;
-  }
-
-  .tw-counter {
-    @apply text-xs mt-1;
-  }
-
-  .tw-button-primary {
-    @apply bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700;
-  }
-
-  .tw-preview {
-    @apply bg-gray-50 border border-gray-200 rounded p-3 text-xs whitespace-pre-wrap;
-  }
 }
 
 /* Layout 2-kolumnowy tylko wewnątrz generatora (.tw) */
@@ -66,7 +33,6 @@
   gap: 2rem;
 }
 
-/* Od szerokości ~768px przechodzimy na 2 kolumny */
 @media (min-width: 768px) {
   .tw .tw-two-col {
     grid-template-columns: repeat(2, minmax(0, 1fr));
