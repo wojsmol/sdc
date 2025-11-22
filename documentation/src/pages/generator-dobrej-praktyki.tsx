@@ -199,7 +199,7 @@ export default function GeneratorDobrejPraktyki() {
       description="Generator MDX dla opisów dobrych praktyk w Sieci Dostępności Cyfrowej"
     >
       <div className="tw">
-        <div className="tw-content max-w-5xl mx-auto p-6 space-y-6">
+        <div className="tw-content max-w-7xl mx-auto p-6 space-y-6">
           <h1 className="text-3xl font-bold text-[#003366]">
             Generator opisu dobrej praktyki (MDX)
           </h1>
