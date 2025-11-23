@@ -99,7 +99,6 @@ export default function GeneratorDobrejPraktyki() {
     defaultValues: initialForm,
   });
 
-  // Load from localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -110,7 +109,6 @@ export default function GeneratorDobrejPraktyki() {
     }
   }, []);
 
-  // Save to localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
     const subscription = form.watch((values) => {
@@ -119,7 +117,6 @@ export default function GeneratorDobrejPraktyki() {
     return () => subscription.unsubscribe();
   }, [form]);
 
-  // Generate MDX preview
   useEffect(() => {
     setMdx(generateMdx(form.getValues(), files));
   }, [form.watch(), files]);
@@ -211,8 +208,10 @@ export default function GeneratorDobrejPraktyki() {
           <Card>
             <CardContent className="p-4 space-y-4">
               <Form {...form}>
-                <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={(e) => e.preventDefault()}>
-                  {/* Lewa kolumna */}
+                <form
+                  className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                  onSubmit={(e) => e.preventDefault()}
+                >
                   <div className="space-y-4">
                     <FormField<FormValues>
                       control={form.control}
@@ -221,7 +220,7 @@ export default function GeneratorDobrejPraktyki() {
                         <FormItem>
                           <FormLabel>Tytuł*</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="Krótka nazwa dobrej praktyki" />
+                            <Input {...field} className="w-full border border-gray-300 rounded-md p-2 bg-white" placeholder="Krótka nazwa dobrej praktyki" />
                           </FormControl>
                           <FormMessage>{errors.title}</FormMessage>
                         </FormItem>
@@ -234,7 +233,7 @@ export default function GeneratorDobrejPraktyki() {
                         <FormItem>
                           <FormLabel>Podmiot realizujący*</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="Nazwa instytucji" />
+                            <Input {...field} className="w-full border border-gray-300 rounded-md p-2 bg-white" placeholder="Nazwa instytucji" />
                           </FormControl>
                           <FormMessage>{errors.podmiot}</FormMessage>
                         </FormItem>
@@ -247,7 +246,7 @@ export default function GeneratorDobrejPraktyki() {
                         <FormItem>
                           <FormLabel>Zgłaszający*</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="Imię i nazwisko" />
+                            <Input {...field} className="w-full border border-gray-300 rounded-md p-2 bg-white" placeholder="Imię i nazwisko" />
                           </FormControl>
                           <FormMessage>{errors.zglaszajacy}</FormMessage>
                         </FormItem>
@@ -261,10 +260,10 @@ export default function GeneratorDobrejPraktyki() {
                           <FormLabel>Wymiar dostępności cyfrowej*</FormLabel>
                           <FormControl>
                             <Select onValueChange={field.onChange} value={field.value}>
-                              <SelectTrigger>
+                              <SelectTrigger className="bg-white border border-gray-300 rounded-md p-2 text-gray-700">
                                 <SelectValue placeholder="-- wybierz wymiar --" />
                               </SelectTrigger>
-                              <SelectContent>
+                              <SelectContent className="bg-white">
                                 {[
                                   "Komunikacja",
                                   "Wiedza i umiejętności",
@@ -292,14 +291,13 @@ export default function GeneratorDobrejPraktyki() {
                         <FormItem>
                           <FormLabel>Dane kontaktowe</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="Adres e-mail lub numer telefonu" />
+                            <Input {...field} className="w-full border border-gray-300 rounded-md p-2 bg-white" placeholder="Adres e-mail lub numer telefonu" />
                           </FormControl>
                         </FormItem>
                       )}
                     />
                   </div>
 
-                  {/* Prawa kolumna */}
                   <div className="space-y-4">
                     <FormField<FormValues>
                       control={form.control}
@@ -308,7 +306,7 @@ export default function GeneratorDobrejPraktyki() {
                         <FormItem>
                           <FormLabel>Krótki opis (500–1500 znaków)*</FormLabel>
                           <FormControl>
-                            <Textarea {...field} rows={6} maxLength={1500} />
+                            <Textarea {...field} className="w-full border border-gray-300 rounded-md p-2 bg-white" rows={6} maxLength={1500} />
                           </FormControl>
                           <div className="flex justify-between text-sm">
                             <span className={opisValid ? "text-green-600" : "text-red-600"}>
@@ -328,7 +326,7 @@ export default function GeneratorDobrejPraktyki() {
                           <FormItem>
                             <FormLabel>{name.charAt(0).toUpperCase() + name.slice(1)}</FormLabel>
                             <FormControl>
-                              <Textarea {...field} rows={3} />
+                              <Textarea {...field} className="w-full border border-gray-300 rounded-md p-2 bg-white" rows={3} />
                             </FormControl>
                           </FormItem>
                         )}
@@ -338,10 +336,9 @@ export default function GeneratorDobrejPraktyki() {
                 </form>
               </Form>
 
-              {/* Załączniki */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium">Załączniki (PDF, DOCX, ZIP)</label>
-                <Input type="file" multiple onChange={handleFileChange} />
+                <Input type="file" multiple onChange={handleFileChange} className="w-full" />
                 {Object.entries(errors)
                   .filter(([k]) => k.startsWith("file:"))
                   .map(([k, m]) => (
@@ -365,11 +362,12 @@ export default function GeneratorDobrejPraktyki() {
                 )}
               </div>
 
-              <Button onClick={handleExportZip}>Pobierz ZIP (MDX + załączniki)</Button>
+              <Button onClick={handleExportZip} className="mt-2 bg-[#003366] hover:bg-[#002244] text-white border-none">
+                Pobierz ZIP (MDX + załączniki)
+              </Button>
             </CardContent>
           </Card>
 
-          {/* Podgląd MDX */}
           <Card>
             <CardContent>
               <h2 className="text-xl font-semibold">Podgląd MDX</h2>

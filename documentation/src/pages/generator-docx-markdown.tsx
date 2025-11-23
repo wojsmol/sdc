@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Layout from "@theme/Layout";
 import JSZip from "jszip";
 import mammoth from "mammoth";
@@ -7,60 +7,41 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import "./tw/tw-tailwind.css";
-
-interface MetaForm {
-  title: string;
-  description: string;
-  sidebar_label: string;
-  sidebar_position: string;
-  keywords: string;
-  opracowanie: string;
-}
-
-interface OptionsForm {
-  cleanupEmptyLines: boolean;
-  normalizeHeadings: boolean;
-}
-
-const initialMeta: MetaForm = {
-  title: "",
-  description: "",
-  sidebar_label: "",
-  sidebar_position: "999",
-  keywords: "",
-  opracowanie: "",
-};
-
-const initialOptions: OptionsForm = {
-  cleanupEmptyLines: true,
-  normalizeHeadings: true,
-};
 
 export default function GeneratorDocxMarkdown() {
-  const [meta, setMeta] = useState<MetaForm>(initialMeta);
-  const [options, setOptions] = useState<OptionsForm>(initialOptions);
-  const [originalMarkdown, setOriginalMarkdown] = useState<string>("");
-  const [markdown, setMarkdown] = useState<string>("");
-  const [filenameBase, setFilenameBase] = useState<string>("converted");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [sidebarLabel, setSidebarLabel] = useState("");
+  const [keywords, setKeywords] = useState("");
+  const [opracowanie, setOpracowanie] = useState("");
+  const [markdown, setMarkdown] = useState("");
+  const [originalMarkdown, setOriginalMarkdown] = useState("");
+  const [filenameBase, setFilenameBase] = useState("converted");
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  const generateIdFromTitle = (title: string) =>
-    (title || "dokument")
+  const [cleanupEmptyLines, setCleanupEmptyLines] = useState(true);
+  const [normalizeHeadings, setNormalizeHeadings] = useState(true);
+
+  const generateId = (text: string) =>
+    (text || "dokument")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
 
   const splitKeywords = (text: string) =>
-    text.split(/\r?\n/).map((k) => k.trim()).filter(Boolean);
+    text
+      .split(/\r?\n/)
+      .map((k) => k.trim())
+      .filter(Boolean);
 
-  const applyMarkdownCleanup = (input: string, opts: OptionsForm) => {
-    let md = input || "";
-    if (opts.cleanupEmptyLines) md = md.replace(/\n{3,}/g, "\n\n");
-    if (opts.normalizeHeadings) {
-      md = md.replace(/^###\s+/gm, "## ").replace(/^##\s+/gm, "# ");
+  const applyMarkdownCleanup = (md: string) => {
+    let result = md;
+    if (cleanupEmptyLines) result = result.replace(/\n{3,}/g, "\n\n");
+    if (normalizeHeadings) {
+      result = result.replace(/^###\s+/gm, "## ");
+      result = result.replace(/^##\s+/gm, "# ");
     }
-    return md;
+    return result;
   };
 
   const handleDocxUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,169 +56,219 @@ export default function GeneratorDocxMarkdown() {
       const result = await mammoth.convertToMarkdown({ arrayBuffer });
       const raw = result.value || "";
       setOriginalMarkdown(raw);
-      const cleaned = applyMarkdownCleanup(raw, options);
-      setMarkdown(cleaned);
+      setMarkdown(applyMarkdownCleanup(raw));
 
-      if (!meta.title)
-        setMeta((prev) => ({
-          ...prev,
-          title: base,
-          sidebar_label: prev.sidebar_label || base,
-        }));
+      if (!title) setTitle(base);
+      if (!sidebarLabel) setSidebarLabel(base);
     } catch (err) {
       console.error(err);
-      setErrors((prev) => ({ ...prev, upload: "Nie udało się przetworzyć DOCX" }));
+      setErrors({ upload: "Nie udało się przetworzyć pliku DOCX." });
     }
   };
 
-  const handleMetaChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setMeta((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-
-  const handleOptionChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    setOptions((prev) => ({ ...prev, [e.target.name]: e.target.checked }));
-
-  const handleApplyOptions = () =>
-    setMarkdown(applyMarkdownCleanup(markdown || originalMarkdown, options));
-
-  const validate = () => {
+  const handleDownload = () => {
     const newErrors: { [key: string]: string } = {};
-    if (!meta.title.trim()) newErrors.title = "Tytuł jest wymagany.";
-    if (!meta.description.trim()) newErrors.description = "Opis jest wymagany.";
-    if (!meta.sidebar_label.trim()) newErrors.sidebar_label = "Etykieta w menu jest wymagana.";
+    if (!title.trim()) newErrors.title = "Tytuł jest wymagany.";
+    if (!description.trim()) newErrors.description = "Opis jest wymagany.";
+    if (!sidebarLabel.trim())
+      newErrors.sidebarLabel = "Etykieta w menu jest wymagana.";
     if (!markdown.trim()) newErrors.markdown = "Brak treści Markdown.";
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    if (Object.keys(newErrors).length) {
+      alert("Popraw błędy przed pobraniem.");
+      return;
+    }
 
-  const buildMarkdownFile = () => {
-    const id = generateIdFromTitle(meta.title);
-    const keywordsArray = splitKeywords(meta.keywords);
+    const id = generateId(title);
+    const kw = splitKeywords(keywords);
     const frontmatter = [
       "---",
       `id: ${id}`,
-      `title: ${meta.title}`,
-      `description: ${meta.description}`,
-      `sidebar_label: ${meta.sidebar_label}`,
-      `sidebar_position: ${meta.sidebar_position || "999"}`,
+      `title: ${title}`,
+      `description: ${description}`,
+      `sidebar_label: ${sidebarLabel}`,
       "keywords:",
-      ...(keywordsArray.length ? keywordsArray.map((k) => `  - ${k}`) : ["  - dostępność cyfrowa"]),
-      `opracowanie: ${meta.opracowanie || ""}`,
+      ...(kw.length ? kw.map((k) => `  - ${k}`) : ["  - dostępność cyfrowa"]),
+      `opracowanie: ${opracowanie}`,
       "---",
       "",
     ].join("\n");
-    return frontmatter + markdown;
-  };
 
-  const handleDownload = () => {
-    if (!validate()) return alert("Uzupełnij wymagane pola.");
-    const blob = new Blob([buildMarkdownFile()], { type: "text/markdown;charset=utf-8" });
+    const blob = new Blob([frontmatter + markdown], {
+      type: "text/markdown;charset=utf-8",
+    });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${generateIdFromTitle(meta.title) || filenameBase}.md`;
+    a.download = `${id || filenameBase}.md`;
     a.click();
   };
 
   const handleDownloadZip = async () => {
-    if (!validate()) return alert("Uzupełnij wymagane pola.");
+    const id = generateId(title);
+    const kw = splitKeywords(keywords);
+    const frontmatter = [
+      "---",
+      `id: ${id}`,
+      `title: ${title}`,
+      `description: ${description}`,
+      `sidebar_label: ${sidebarLabel}`,
+      "keywords:",
+      ...(kw.length ? kw.map((k) => `  - ${k}`) : ["  - dostępność cyfrowa"]),
+      `opracowanie: ${opracowanie}`,
+      "---",
+      "",
+    ].join("\n");
+
     const zip = new JSZip();
-    zip.file(`${generateIdFromTitle(meta.title) || filenameBase}.md`, buildMarkdownFile());
+    zip.file(`${id || filenameBase}.md`, frontmatter + markdown);
     const blob = await zip.generateAsync({ type: "blob" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${generateIdFromTitle(meta.title) || filenameBase}.zip`;
+    a.download = `${id || filenameBase}.zip`;
     a.click();
   };
 
   return (
-    <Layout title="Generator DOCX na Markdown" description="Generator DOCX na Markdown">
-      <div className="tw">
-        <div className="tw-content max-w-5xl mx-auto p-6 space-y-6">
-          <h1 className="text-3xl font-bold text-[#003366]">Generator Markdown z DOCX</h1>
-          <p className="text-sm text-gray-700">
-            Prześlij DOCX, uzupełnij metadane i pobierz plik Markdown lub ZIP.
-          </p>
+    <Layout
+      title="Generator DOCX → Markdown"
+      description="Generator Markdown z DOCX dla Sieci Dostępności Cyfrowej"
+    >
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        <h1 className="text-3xl font-bold text-[#003366]">
+          Generator Markdown z pliku DOCX
+        </h1>
+        <p className="text-sm text-gray-700">
+          Prześlij plik DOCX, uzupełnij metadane i pobierz gotowy plik Markdown.
+        </p>
 
-          <Card>
-            <CardContent className="space-y-6 grid md:grid-cols-2 gap-6">
-              {/* LEWA KOLUMNA */}
-              <div className="space-y-4">
-                <div>
-                  <Label>Plik DOCX</Label>
-                  <Input type="file" accept=".docx" onChange={handleDocxUpload} />
-                  {errors.upload && <p className="text-xs text-red-600">{errors.upload}</p>}
-                </div>
-
-                <div>
-                  <Label>Tytuł (title) *</Label>
-                  <Input name="title" value={meta.title} onChange={handleMetaChange} />
-                  {errors.title && <p className="text-xs text-red-600">{errors.title}</p>}
-                </div>
-
-                <div>
-                  <Label>Opis (description) *</Label>
-                  <Textarea name="description" value={meta.description} onChange={handleMetaChange} rows={3} />
-                  {errors.description && <p className="text-xs text-red-600">{errors.description}</p>}
-                </div>
-
-                <div>
-                  <Label>Sidebar label *</Label>
-                  <Input name="sidebar_label" value={meta.sidebar_label} onChange={handleMetaChange} />
-                  {errors.sidebar_label && <p className="text-xs text-red-600">{errors.sidebar_label}</p>}
-                </div>
-
-                <div>
-                  <Label>Sidebar position</Label>
-                  <Input type="number" name="sidebar_position" value={meta.sidebar_position} onChange={handleMetaChange} />
-                </div>
-
-                <div>
-                  <Label>Słowa kluczowe</Label>
-                  <Textarea name="keywords" value={meta.keywords} onChange={handleMetaChange} rows={3} placeholder="Jedno słowo na linię" />
-                </div>
-
-                <div>
-                  <Label>Opracowanie</Label>
-                  <Input name="opracowanie" value={meta.opracowanie} onChange={handleMetaChange} />
-                </div>
-
-                <div>
-                  <Label>Opcje Markdown</Label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" name="cleanupEmptyLines" checked={options.cleanupEmptyLines} onChange={handleOptionChange} />
-                    Usuń nadmiarowe puste linie
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" name="normalizeHeadings" checked={options.normalizeHeadings} onChange={handleOptionChange} />
-                    Ujednolić nagłówki
-                  </label>
-                  <Button type="button" onClick={handleApplyOptions} className="mt-2">Zastosuj opcje</Button>
-                </div>
-
-                <div className="flex gap-3 flex-wrap">
-                  <Button type="button" onClick={handleDownload}>Pobierz Markdown</Button>
-                  <Button type="button" variant="outline" onClick={handleDownloadZip}>Pobierz ZIP</Button>
-                </div>
+        <Card>
+          <CardContent className="p-6 space-y-6 grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <Label>Tytuł *</Label>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+                {errors.title && <p className="text-red-600 text-sm">{errors.title}</p>}
               </div>
 
-              {/* PRAWA KOLUMNA */}
+              <div>
+                <Label>Opis *</Label>
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                />
+                {errors.description && (
+                  <p className="text-red-600 text-sm">{errors.description}</p>
+                )}
+              </div>
+
+              <div>
+                <Label>Etykieta w menu *</Label>
+                <Input
+                  value={sidebarLabel}
+                  onChange={(e) => setSidebarLabel(e.target.value)}
+                />
+                {errors.sidebarLabel && (
+                  <p className="text-red-600 text-sm">{errors.sidebarLabel}</p>
+                )}
+              </div>
+
+              <div>
+                <Label>Słowa kluczowe</Label>
+                <Textarea
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
+                  rows={3}
+                  placeholder="Wpisz po jednym słowie / frazie w każdej linii"
+                />
+              </div>
+
+              <div>
+                <Label>Opracowanie</Label>
+                <Input
+                  value={opracowanie}
+                  onChange={(e) => setOpracowanie(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label>Plik DOCX</Label>
+                <Input type="file" accept=".docx" onChange={handleDocxUpload} />
+                {errors.upload && <p className="text-red-600 text-sm">{errors.upload}</p>}
+              </div>
+
               <div className="space-y-2">
-                <Label>Edytor Markdown</Label>
-                <Textarea value={markdown} onChange={(e) => setMarkdown(e.target.value)} rows={20} className="font-mono text-sm" />
-                {errors.markdown && <p className="text-xs text-red-600">{errors.markdown}</p>}
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={cleanupEmptyLines}
+                    onChange={(e) => setCleanupEmptyLines(e.target.checked)}
+                  />
+                  Usuń nadmiarowe puste linie
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={normalizeHeadings}
+                    onChange={(e) => setNormalizeHeadings(e.target.checked)}
+                  />
+                  Ujednolić poziomy nagłówków
+                </label>
+                <Button type="button" onClick={() => setMarkdown(applyMarkdownCleanup(originalMarkdown))}>
+                  Zastosuj opcje
+                </Button>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Podgląd pliku */}
-          <Card>
-            <CardContent className="p-4 space-y-2">
-              <h2 className="text-xl font-semibold">Podgląd pliku</h2>
-              <pre className="bg-gray-100 p-4 rounded border text-xs whitespace-pre-wrap overflow-x-auto">
-                {buildMarkdownFile()}
-              </pre>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="flex flex-wrap gap-3">
+                <Button type="button" onClick={handleDownload}>
+                  Pobierz Markdown (.md)
+                </Button>
+                <Button type="button" variant="outline" onClick={handleDownloadZip}>
+                  Pobierz ZIP (.md + archiwum)
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <Label>Edytor Markdown</Label>
+              <Textarea
+                value={markdown}
+                onChange={(e) => setMarkdown(e.target.value)}
+                rows={20}
+                className="font-mono"
+              />
+              {errors.markdown && <p className="text-red-600 text-sm">{errors.markdown}</p>}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent>
+            <h2 className="text-xl font-semibold">Podgląd pliku</h2>
+            <pre className="bg-gray-100 p-4 rounded border text-xs whitespace-pre-wrap overflow-x-auto">
+              {(() => {
+                const id = generateId(title || filenameBase);
+                const kw = splitKeywords(keywords);
+                const frontmatter = [
+                  "---",
+                  `id: ${id}`,
+                  `title: ${title}`,
+                  `description: ${description}`,
+                  `sidebar_label: ${sidebarLabel}`,
+                  "keywords:",
+                  ...(kw.length ? kw.map((k) => `  - ${k}`) : ["  - dostępność cyfrowa"]),
+                  `opracowanie: ${opracowanie}`,
+                  "---",
+                  "",
+                ].join("\n");
+                return frontmatter + markdown;
+              })()}
+            </pre>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );
