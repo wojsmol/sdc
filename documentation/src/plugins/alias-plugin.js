@@ -3,7 +3,6 @@ const path = require("path");
 
 module.exports = function aliasPlugin() {
   const resolvedPath = path.resolve(process.cwd(), "src");
-  console.log("[Alias Plugin] @ resolves to:", resolvedPath);
 
   return {
     name: "alias-plugin",
